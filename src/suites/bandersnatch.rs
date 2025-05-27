@@ -1,4 +1,4 @@
-//! `ECVRF Bandersnatch SHA-512 Elligator2` suite.
+//! # ECVRF Bandersnatch SHA-512 Elligator2 suite
 //!
 //! Configuration:
 //!
