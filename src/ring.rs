@@ -43,6 +43,7 @@ use ark_ec::{
     pairing::Pairing,
     twisted_edwards::{Affine as TEAffine, TECurveConfig},
 };
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::ops::Range;
 use pedersen::{PedersenSuite, Proof as PedersenProof};
 use utils::te_sw_map::TEMapping;
@@ -280,7 +281,7 @@ where
 /// Contains the cryptographic parameters needed for ring proof generation and verification:
 /// - `pcs`: Polynomial Commitment Scheme parameters (KZG setup)
 /// - `piop`: Polynomial Interactive Oracle Proof parameters
-#[derive(Clone)]
+#[derive(Clone, CanonicalDeserialize, CanonicalSerialize)]
 pub struct RingProofParams<S: RingSuite>
 where
     BaseField<S>: ark_ff::PrimeField,
@@ -460,60 +461,6 @@ where
     #[inline(always)]
     pub const fn padding_point() -> AffinePoint<S> {
         S::PADDING
-    }
-}
-
-impl<S: RingSuite> CanonicalSerialize for RingProofParams<S>
-where
-    BaseField<S>: ark_ff::PrimeField,
-    CurveConfig<S>: TECurveConfig + Clone,
-    AffinePoint<S>: TEMapping<CurveConfig<S>>,
-{
-    fn serialize_with_mode<W: ark_serialize::Write>(
-        &self,
-        mut writer: W,
-        compress: ark_serialize::Compress,
-    ) -> Result<(), ark_serialize::SerializationError> {
-        self.pcs.serialize_with_mode(&mut writer, compress)
-    }
-
-    fn serialized_size(&self, compress: ark_serialize::Compress) -> usize {
-        self.pcs.serialized_size(compress)
-    }
-}
-
-impl<S: RingSuite> CanonicalDeserialize for RingProofParams<S>
-where
-    BaseField<S>: ark_ff::PrimeField,
-    CurveConfig<S>: TECurveConfig + Clone,
-    AffinePoint<S>: TEMapping<CurveConfig<S>>,
-{
-    fn deserialize_with_mode<R: ark_serialize::Read>(
-        mut reader: R,
-        compress: ark_serialize::Compress,
-        validate: ark_serialize::Validate,
-    ) -> Result<Self, ark_serialize::SerializationError> {
-        let pcs_params = <PcsParams<S> as CanonicalDeserialize>::deserialize_with_mode(
-            &mut reader,
-            compress,
-            validate,
-        )?;
-        let piop_domain_size = piop_domain_size_from_pcs_domain_size(pcs_params.powers_in_g1.len());
-        Ok(Self {
-            pcs: pcs_params,
-            piop: piop_params::<S>(piop_domain_size),
-        })
-    }
-}
-
-impl<S: RingSuite> ark_serialize::Valid for RingProofParams<S>
-where
-    BaseField<S>: ark_ff::PrimeField,
-    CurveConfig<S>: TECurveConfig + Clone,
-    AffinePoint<S>: TEMapping<CurveConfig<S>>,
-{
-    fn check(&self) -> Result<(), ark_serialize::SerializationError> {
-        self.pcs.check()
     }
 }
 
