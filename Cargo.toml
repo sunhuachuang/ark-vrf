@@ -13,6 +13,7 @@ ark-ec = { version = "0.5", default-features = false }
 ark-ff = { version = "0.5", default-features = false }
 ark-std = { version = "0.5", default-features = false }
 ark-serialize = { version = "0.5", default-features = false }
+ark-poly = { version = "0.5", default-features = false }
 zeroize = { version = "1.8", default-features = false }
 digest = { version = "0.10", default-features = false }
 sha2 = { version = "0.10", default-features = false }
@@ -20,6 +21,7 @@ rand_chacha = { version = "0.3", default-features = false }
 rayon = { version = "1.10", default-features = false, optional = true }
 hmac = {version = "0.12", default-features = false, optional = true }
 w3f-ring-proof = { git = "https://github.com/sunhuachuang/ring-proof", version = "0.0.2", default-features = false, optional = true }
+
 # Curves
 ark-secp256r1 = { version = "0.5", default-features = false, optional = true }
 ark-ed25519 = { version = "0.5", default-features = false, optional = true }
@@ -42,6 +44,7 @@ default = [ "std" ]
 std = [
   "ark-std/std",
   "ark-ec/std",
+  "ark-poly/std",
   "w3f-ring-proof?/std",
 ]
 secret-split = [ "ark-std/getrandom" ]
@@ -67,6 +70,7 @@ parallel = [
   "ark-ec/parallel",
   "ark-ff/parallel",
   "ark-std/parallel",
+  "ark-poly/parallel",
   "w3f-ring-proof?/parallel",
   "rayon",
 ]

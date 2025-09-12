@@ -45,9 +45,11 @@ use ark_ec::{
 };
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::ops::Range;
+use ark_poly::EvaluationDomain;
 use pedersen::{PedersenSuite, Proof as PedersenProof};
 use utils::te_sw_map::TEMapping;
 use w3f_ring_proof as ring_proof;
+use ring_proof::pcs::PcsParams as BasePcsParams;
 
 /// Magic spell for [RingSuite::ACCUMULATOR_BASE] generation in built-in implementations.
 ///
@@ -113,6 +115,7 @@ where
 
 /// KZG Polinomial Commitment Scheme.
 pub type Pcs<S> = ring_proof::pcs::kzg::KZG<<S as RingSuite>::Pairing>;
+pub type CK<S> = ring_proof::pcs::kzg::params::KzgCommitterKey<<<S as RingSuite>::Pairing as ark_ec::pairing::Pairing>::G1Affine>;
 
 /// KZG commitment.
 pub type PcsCommitment<S> =
@@ -127,7 +130,7 @@ pub type PcsParams<S> = ring_proof::pcs::kzg::urs::URS<<S as RingSuite>::Pairing
 ///
 /// Basically all the application specific parameters required to construct and
 /// verify the ring proof.
-pub type PiopParams<S> = ring_proof::PiopParams<BaseField<S>, CurveConfig<S>>;
+pub type PiopParams<S> = ring_proof::PiopParams<BaseField<S>, CurveConfig<S>, Pcs<S>>;
 
 /// Ring keys commitment.
 pub type RingCommitment<S> = ring_proof::FixedColumnsCommitted<BaseField<S>, PcsCommitment<S>>;
@@ -292,15 +295,18 @@ where
     pub pcs: PcsParams<S>,
     /// PIOP parameters.
     pub piop: PiopParams<S>,
+    /// PCS with lagrange
+    pub pcs_lagrange: CK<S>,
 }
 
-pub(crate) fn piop_params<S: RingSuite>(domain_size: usize) -> PiopParams<S>
+pub(crate) fn piop_params<S: RingSuite>(domain_size: usize, ck: &CK<S>) -> PiopParams<S>
 where
     BaseField<S>: ark_ff::PrimeField,
     CurveConfig<S>: TECurveConfig + Clone,
     AffinePoint<S>: TEMapping<CurveConfig<S>>,
 {
     PiopParams::<S>::setup(
+        ck,
         ring_proof::Domain::new(domain_size, true),
         S::BLINDING_BASE.into_te(),
         S::ACCUMULATOR_BASE.into_te(),
@@ -348,10 +354,18 @@ where
         // Keep only the required powers of tau
         pcs_params.powers_in_g1.truncate(pcs_domain_size);
         pcs_params.powers_in_g2.truncate(2);
+
         let piop_domain_size = piop_domain_size::<S>(ring_size);
+
+        // Build lagrange SRS
+        let size = ring_proof::Domain::<BaseField<S>>::new(piop_domain_size, true).domain().size();
+        let pcs_lagrange = pcs_params.ck_with_lagrangian(size);
+        let piop = piop_params::<S>(piop_domain_size, &pcs_lagrange);
+
         Ok(Self {
             pcs: pcs_params,
-            piop: piop_params::<S>(piop_domain_size),
+            piop,
+            pcs_lagrange
         })
     }
 
@@ -393,7 +407,8 @@ where
     /// * `pks` - Array of public keys forming the ring
     pub fn verifier_key(&self, pks: &[AffinePoint<S>]) -> RingVerifierKey<S> {
         let pks = TEMapping::to_te_slice(&pks[..pks.len().min(self.max_ring_size())]);
-        ring_proof::index(&self.pcs, &self.piop, &pks).1
+        let pcs_raw_vk = self.pcs.raw_vk();
+        ring_proof::index_lagrange(self.pcs_lagrange.clone(), pcs_raw_vk, &self.piop, &pks).1
     }
 
     /// Create a verifier key from a precomputed ring commitment.
@@ -443,16 +458,16 @@ where
     ///
     /// * `verifier_key` - Ring verifier key
     /// * `ring_size` - Size of the ring used to create the verifier key
-    pub fn verifier_no_context(
-        verifier_key: RingVerifierKey<S>,
-        ring_size: usize,
-    ) -> RingVerifier<S> {
-        RingVerifier::<S>::init(
-            verifier_key,
-            piop_params::<S>(piop_domain_size::<S>(ring_size)),
-            ring_proof::ArkTranscript::new(S::SUITE_ID),
-        )
-    }
+    // pub fn _verifier_no_context(
+    //     verifier_key: RingVerifierKey<S>,
+    //     ring_size: usize,
+    // ) -> RingVerifier<S> {
+    //     RingVerifier::<S>::init(
+    //         verifier_key,
+    //         piop_params::<S>(piop_domain_size::<S>(ring_size, ck)),
+    //         ring_proof::ArkTranscript::new(S::SUITE_ID),
+    //     )
+    // }
 
     /// Get the padding point.
     ///
