@@ -408,7 +408,7 @@ where
     pub fn verifier_key(&self, pks: &[AffinePoint<S>]) -> RingVerifierKey<S> {
         let pks = TEMapping::to_te_slice(&pks[..pks.len().min(self.max_ring_size())]);
         let pcs_raw_vk = self.pcs.raw_vk();
-        ring_proof::index_lagrange(self.pcs_lagrange.clone(), pcs_raw_vk, &self.piop, &pks).1
+        ring_proof::verifier_key(self.pcs_lagrange.clone(), pcs_raw_vk, &self.piop, &pks)
     }
 
     /// Create a verifier key from a precomputed ring commitment.
